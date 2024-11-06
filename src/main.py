@@ -1,7 +1,7 @@
 import argparse
 import torch
 from torchvision import transforms, datasets
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, random_split, WeightedRandomSampler
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch import nn
@@ -14,11 +14,11 @@ def train_val_split(data):
     train_data, val_data = random_split(data, [train_data_size, val_data_size])
     return train_data, val_data
 
-def init_dataloaders(train_data, val_data, test_data):
+def init_dataloaders(train_data, val_data, test_data, train_sampler):
     batch_size = 32
     n_workers = 4
 
-    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, num_workers=n_workers)
+    train_loader = DataLoader(train_data, batch_size=batch_size, sampler=train_sampler, num_workers=n_workers)
     val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False, num_workers=n_workers)
     test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False, num_workers=n_workers)
     return train_loader, val_loader, test_loader
@@ -152,7 +152,14 @@ def main():
     val_data.dataset.transform = val_test_transforms
     test_data = datasets.ImageFolder(root=test_data_dir, transform=val_test_transforms)
 
-    train_loader, val_loader, test_loader = init_dataloaders(train_data, val_data, test_data)
+    class_counts = [0] * len(train_dataset.classes)
+    for _, label in train_data:
+        class_counts[label] += 1
+    class_weights = 1 / torch.tensor(class_counts, dtype=torch.float)
+    sample_weights = [class_weights[label] for _, label in train_data]
+    train_sampler = WeightedRandomSampler(sample_weights, len(sample_weights))
+
+    train_loader, val_loader, test_loader = init_dataloaders(train_data, val_data, test_data, train_sampler)
 
     model = EmotionDetecterCNN(num_classes=len(train_dataset.classes))
 
@@ -163,6 +170,8 @@ def main():
     num_epochs = 20
 
     if args.test:
+        checkpoint = torch.load('EmotionClassifierCNN.ckpt', map_location=device, weights_only=True)
+        model.load_state_dict(checkpoint['model_state_dict'])
         test(model, test_loader, criterion, device)
     else:
         train(model, train_loader, val_loader, optimizer, criterion, scheduler, device, num_epochs)

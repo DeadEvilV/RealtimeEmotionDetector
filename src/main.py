@@ -2,8 +2,8 @@ import argparse
 import torch
 from torchvision import transforms, datasets
 from torch.utils.data import DataLoader, random_split, WeightedRandomSampler
-from torch.optim import Adam
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim import SGD
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch import nn
 from model import EmotionDetecterCNN
 from tqdm import tqdm
@@ -15,12 +15,12 @@ def train_val_split(data):
     return train_data, val_data
 
 def init_dataloaders(train_data, val_data, test_data, train_sampler):
-    batch_size = 32
-    n_workers = 4
+    batch_size = 16
+    n_workers = 16
 
     train_loader = DataLoader(train_data, batch_size=batch_size, sampler=train_sampler, num_workers=n_workers)
-    val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False, num_workers=n_workers)
-    test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False, num_workers=n_workers)
+    val_loader = DataLoader(val_data, batch_size=batch_size, num_workers=n_workers)
+    test_loader = DataLoader(test_data, batch_size=batch_size, num_workers=n_workers)
     return train_loader, val_loader, test_loader
 
 def train(model, train_loader, val_loader, optimizer, criterion, scheduler, device, num_epochs):
@@ -43,7 +43,7 @@ def train(model, train_loader, val_loader, optimizer, criterion, scheduler, devi
                 pbar.update(1)
                 pbar.set_postfix(loss=loss.item())
             avg_loss = evaluate(model, val_loader, criterion, device)
-            scheduler.step(avg_loss)
+            scheduler.step()
         if (epoch + 1) % 5 == 0:
             torch.save({'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict()},
@@ -130,13 +130,10 @@ def main():
     
     train_transforms = transforms.Compose([
         transforms.Grayscale(num_output_channels=1),
-        transforms.RandomHorizontalFlip(),
-        transforms.GaussianBlur(3),
-        transforms.RandomInvert(),
         transforms.RandomRotation(10),
+        transforms.RandomHorizontalFlip(),
         transforms.ColorJitter(brightness=0.2),
-        transforms.RandomErasing(p=0.5, scale=(0.02, 0.33), ratio=(0.3, 3.3)),
-        transforms.RandomResizedCrop(44, scale=(0.8, 1.0)),
+        transforms.CenterCrop(40),
         transforms.ToTensor(),
         transforms.Normalize(mean, std)
     ])
@@ -161,12 +158,12 @@ def main():
     train_loader, val_loader, test_loader = init_dataloaders(train_data, val_data, test_data, train_sampler)
 
     model = EmotionDetecterCNN(num_classes=len(train_dataset.classes))
-
-    optimizer = Adam(model.parameters(), lr=0.001)
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3)
-    criterion = nn.CrossEntropyLoss()
+    model = model.to(device)
 
     num_epochs = 20
+    optimizer = SGD(model.parameters(), lr=0.0005, momentum=0.9, weight_decay=0.0001)
+    scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs)
+    criterion = nn.CrossEntropyLoss()
 
     if args.test:
         checkpoint = torch.load('EmotionClassifierCNN.ckpt', map_location=device, weights_only=True)

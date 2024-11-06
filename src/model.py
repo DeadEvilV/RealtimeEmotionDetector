@@ -6,11 +6,20 @@ class ResidualBlock(nn.Module):
         self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, padding=1)
         self.bn1 = nn.BatchNorm2d(out_channels)
         self.relu = nn.ReLU()
-        self.conv2 = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=3, padding=1)
         self.bn2 = nn.BatchNorm2d(out_channels)
+
+        self.mismatch = False
+        if in_channels != out_channels:
+            self.shortcut = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1)
+            self.bn_shortcut = nn.BatchNorm2d(out_channels)
+            self.mismatch = True
         
     def forward(self, x):
-        residual = x
+        if self.mismatch:
+            residual = self.relu(self.bn_shortcut(self.shortcut(x)))
+        else:
+            residual = x
         x = self.relu(self.bn1(self.conv1(x)))
         x = self.relu(self.bn2(self.conv2(x)))
         x = x + residual
@@ -22,24 +31,25 @@ class EmotionDetecterCNN(nn.Module):
         self.relu = nn.ReLU()
         self.maxpool = nn.MaxPool2d(2, 2)
 
-        self.dropout1 = nn.Dropout2d(0.2)
-        self.dropout2 = nn.Dropout2d(0.3)
-        self.dropout3 = nn.Dropout2d(0.4)
+        self.dropout1 = nn.Dropout2d(0.15)
+        self.dropout2 = nn.Dropout2d(0.2)
+        self.dropout3 = nn.Dropout2d(0.3)
+        self.dropout_fc = nn.Dropout(0.25)
         
-        self.rb1 = ResidualBlock(1, 1)
+        self.rb1 = ResidualBlock(1, 32)
 
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(32)
+        self.conv1 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(64)
                 
-        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(64)
+        self.conv2 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(128)
         
-        self.rb2 = ResidualBlock(64, 64)
+        self.rb2 = ResidualBlock(128, 256)
 
-        self.conv3 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1)
-        self.bn3 = nn.BatchNorm2d(128)
+        self.conv3 = nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, padding=1)
+        self.bn3 = nn.BatchNorm2d(256)
         
-        self.conv4 = nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, padding=1)
+        self.conv4 = nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, padding=1)
         self.bn4 = nn.BatchNorm2d(256)
         
         self.rb3 = ResidualBlock(256, 256)
@@ -53,7 +63,7 @@ class EmotionDetecterCNN(nn.Module):
         self.adaptiveavg = nn.AdaptiveAvgPool2d(1)
 
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(in_features=512 * 1 * 1, out_features=num_classes)
+        self.fc = nn.Linear(in_features=512, out_features=num_classes)
 
     def forward(self, x):
         x = self.rb1(x)

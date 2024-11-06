@@ -8,6 +8,7 @@ def preprocess():
     mean = 0.5073
     std = 0.2120
     image_transforms = transforms.Compose([
+        transforms.Grayscale(num_output_channels=1),
         transforms.Resize((44, 44)),
         transforms.ToTensor(),
         transforms.Normalize(mean, std)
@@ -23,6 +24,7 @@ def main():
     model.eval()
     emotion_labels = {0: 'angry', 1: 'disgust', 2: 'fear',
                            3: 'happy', 4: 'neutral', 5: 'sad', 6: 'surprise'}
+    confidence_threshold = 0.2
     image_transforms = preprocess()
     
     face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
@@ -44,12 +46,16 @@ def main():
             input = image_transforms(face_pil).unsqueeze(0).to(device)
             with torch.no_grad():
                 logits = model(input)
-                _, prediction = torch.max(logits, dim=1)
+                probablities = torch.softmax(logits, dim=1)
+                confidence, prediction = torch.max(probablities, dim=1)
+                confidence = confidence.item()
                 emotion = emotion_labels[prediction.item()]
-            cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
-            label_position = (x, y-10)
-            cv2.putText(frame, emotion, label_position, cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
-        
+            if confidence > confidence_threshold:
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                label_position = (x, y-10)
+                label = f'{emotion} {confidence:.2f}'
+                cv2.putText(frame, label, label_position, cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+            
         cv2.imshow('Real Time Emotion Detection', frame)
         
         # press q to quit

@@ -22,8 +22,9 @@ class EmotionDetecterCNN(nn.Module):
         self.relu = nn.ReLU()
         self.maxpool = nn.MaxPool2d(2, 2)
 
-        self.dropout1 = nn.Dropout2d(0.25)
-        self.dropout2 = nn.Dropout2d(0.35)
+        self.dropout1 = nn.Dropout2d(0.2)
+        self.dropout2 = nn.Dropout2d(0.3)
+        self.dropout3 = nn.Dropout2d(0.4)
         
         self.rb1 = ResidualBlock(1, 1)
 
@@ -45,6 +46,9 @@ class EmotionDetecterCNN(nn.Module):
 
         self.conv5 = nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, padding=1)
         self.bn5 = nn.BatchNorm2d(512)
+        
+        self.conv6 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1)
+        self.bn6 = nn.BatchNorm2d(512)
         
         self.adaptiveavg = nn.AdaptiveAvgPool2d(1)
 
@@ -75,8 +79,12 @@ class EmotionDetecterCNN(nn.Module):
         x = self.rb3(x)
 
         x = self.relu(self.bn5(self.conv5(x)))
-        x = self.adaptiveavg(x)
+        x = self.maxpool(x)
         x = self.dropout2(x)
+        
+        x = self.relu(self.bn6(self.conv6(x)))
+        x = self.adaptiveavg(x)
+        x = self.dropout3(x)
 
         x = self.flatten(x)
         x = self.fc(x)

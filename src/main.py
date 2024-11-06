@@ -108,7 +108,6 @@ def calculate_mean_std(train_data):
         samples += 1
     mean /= samples
     std /= samples  
-    print(f'Mean: {mean}, Std: {std}')
     return mean, std
     
 def main():

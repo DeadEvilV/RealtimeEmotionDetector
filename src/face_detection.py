@@ -4,7 +4,7 @@ from torchvision import transforms
 from PIL import Image
 from model import EmotionDetecterCNN
 
-def preprocess(mean, std):
+def preprocess():
     mean = 0.5073
     std = 0.2120
     image_transforms = transforms.Compose([

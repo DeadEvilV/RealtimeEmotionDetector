@@ -14,6 +14,8 @@ The purpose of this project was educational, so the model’s accuracy isn’t p
 
 ## How to use
 ```bash
+git clone https://github.com/DeadEvilV/RealtimeEmotionDetector.git
+cd RealtimeEmotionDetector
 pip install -r requirements.txt
 python src/realtime_emotion_detector.py
 ```

@@ -18,5 +18,7 @@ pip install -r requirements.txt
 python src/realtime_emotion_detector.py
 ```
 
+If your computer does not have access to a webcam, you can download apps such as Iriun Webcam.
+
 ![image](https://github.com/user-attachments/assets/d57233e7-8e26-4159-a719-82b4a266c824)
 ![image](https://github.com/user-attachments/assets/896db1f4-67fc-4cfe-8b23-328b59f5ba5f)
